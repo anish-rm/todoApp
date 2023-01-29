@@ -1,7 +1,10 @@
 const mongoose = require('mongoose');
 const validator = require('validator');
+const bcrypt = require('bcryptjs');
+const crypto = require('crypto');
+const { nextTick } = require('process');
 
-const userSchema = new mongoose.Mongoose.Schema({
+const userSchema = new mongoose.Schema({
     name: {
         type: String,
         required: [true, 'Please give your name']
@@ -31,6 +34,7 @@ const userSchema = new mongoose.Mongoose.Schema({
     passwordConfirm: {
         type: String,
         required: [true, 'Please confirm your password'],
+        select: false,
         // custom validation
         validate: {
             validator: function (el) {
@@ -48,6 +52,24 @@ const userSchema = new mongoose.Mongoose.Schema({
         select: false
     }
 });
+
+// Hashing password and storing it in db
+
+userSchema.pre('save', async function(next){
+    if(!this.isModified('password')) return next();
+
+    this.password = await bcrypt.hash(this.password, 12);
+
+    // we should not save pwd confirm in db
+    this.passwordConfirm = undefined;
+    next();
+});
+
+// to check whether pwd is correct or not
+
+userSchema.methods.correctPassword = async function(candidatePassword, userPassword) {
+    return await bcrypt.compare(candidatePassword,userPassword);
+}
 
 const User = mongoose.model('User',userSchema);
 
